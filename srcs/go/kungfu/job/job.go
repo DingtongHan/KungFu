@@ -24,9 +24,53 @@ type Job struct {
 	Prog         string
 	Args         []string
 	LogDir       string
-
 	AllowNVLink bool
 }
+
+func (j Job) NewMProc(peer plan.PeerID, gpuID int, initClusterVersion int, cluster plan.Cluster, num int) proc.Proc {
+	envs := proc.Envs{
+		env.JobStartTimestamp:        strconv.FormatInt(j.StartTime.Unix(), 10),
+		env.ProcStartTimestamp:       strconv.FormatInt(time.Now().Unix(), 10),
+		env.SelfSpecEnvKey:           peer.String(),
+		env.RunnerListEnvKey:         cluster.Runners.String(),
+		env.ParentIDEnvKey:           j.Parent.String(),
+		env.PeerListEnvKey:           cluster.Workers.String(),
+		env.InitClusterVersionEnvKey: strconv.Itoa(initClusterVersion),
+		env.AllReduceStrategyEnvKey:  j.Strategy.String(),
+		env.ConfigServerEnvKey:       j.ConfigServer,
+		env.AllowNvLink:              fmt.Sprintf("%v", j.AllowNVLink),
+	}
+	if len(j.ConfigServer) > 0 {
+		envs[env.ConfigServerEnvKey] = j.ConfigServer
+	}
+	cudaIdx := strconv.Itoa(getCudaIndex(gpuID))
+	envs[`KUNGFU_`+cudaVisibleDevicesKey] = cudaIdx
+	if j.AllowNVLink {
+		log.Warnf("Please set `config.gpu_options.visible_device_list = str(local_rank)`")
+	} else {
+		envs[cudaVisibleDevicesKey] = cudaIdx
+	}
+
+	allEnvs := proc.Merge(getConfigEnvs(), envs)
+	allEnvs.AddIfMissing(`PYTHONUNBUFFERED`, `1`)
+	var pubAddr string
+	for _, h := range j.HostList {
+		if h.IPv4 == peer.IPv4 {
+			pubAddr = h.PublicAddr
+		}
+	}
+    monitorargs := []string{"examples/monitor.py","--n-epochs", "10"}
+//strconv.Itoa(num)
+	return proc.Proc{
+		Name:     fmt.Sprintf("%s.%d", plan.FormatIPv4(peer.IPv4), peer.Port),
+		Prog:     j.Prog,
+		Args:     monitorargs,
+		Envs:     allEnvs,
+		Hostname: pubAddr,
+		LogDir:   j.LogDir,
+	}
+}
+
 
 func (j Job) NewProc(peer plan.PeerID, gpuID int, initClusterVersion int, cluster plan.Cluster) proc.Proc {
 	envs := proc.Envs{
@@ -73,11 +117,13 @@ func (j Job) NewProc(peer plan.PeerID, gpuID int, initClusterVersion int, cluste
 
 func (j Job) CreateProcs(cluster plan.Cluster, host uint32) []proc.Proc {
 	var ps []proc.Proc
+	//var num int = 0
 	for _, self := range cluster.Workers.On(host) {
-		localRank, _ := cluster.Workers.LocalRank(self)
-		proc := j.NewProc(self, localRank, 0, cluster)
-		ps = append(ps, proc)
+	    localRank, _ := cluster.Workers.LocalRank(self)
+	    proc := j.NewProc(self, localRank, 0, cluster)
+	    ps = append(ps, proc)
 	}
+
 	return ps
 }
 

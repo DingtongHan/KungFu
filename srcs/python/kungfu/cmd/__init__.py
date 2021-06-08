@@ -8,7 +8,15 @@ def run():
     clib = _load_clib('libkungfu')
     clib.kungfu_run_main()
 
-
+def sendbegin():
+    clib = _load_clib('libkungfu')
+    clib.kungfu_run_send_begin()
+def sendend():
+    clib = _load_clib('libkungfu')
+    clib.kungfu_run_send_end()
+def sendtrainend():
+    clib = _load_clib('libkungfu')
+    clib.kungfu_run_send_trainend()
 class _RunWorker(object):
     def __init__(self, f, np):
         self._np = np

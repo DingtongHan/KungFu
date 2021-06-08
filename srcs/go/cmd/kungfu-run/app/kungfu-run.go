@@ -6,7 +6,10 @@ import (
 	"os"
 	"path"
 	"time"
-
+        "bytes"
+        "encoding/json"
+        "net/http"
+        "strconv"
 	"github.com/lsds/KungFu/srcs/go/kungfu/job"
 	"github.com/lsds/KungFu/srcs/go/kungfu/runner"
 	"github.com/lsds/KungFu/srcs/go/log"
@@ -14,6 +17,9 @@ import (
 	"github.com/lsds/KungFu/srcs/go/utils"
 	"github.com/lsds/KungFu/srcs/go/utils/xterm"
 )
+type Message struct {
+    Key string `json:"key"`
+}
 
 func Main(args []string) {
 	var f runner.FlagSet
@@ -110,6 +116,62 @@ func Main(args []string) {
 		runner.SimpleRun(ctx, localhostIPv4, initCluster, j, f.VerboseLog)
 	}
 }
+
+func sendbegin(currentrank int) {
+    url := "http://127.0.0.1:8080"
+    contentType := "application/json;charset=utf-8"
+    data := "begin:" + strconv.Itoa(currentrank)
+    msg := Message{Key: data}
+    b ,err := json.Marshal(msg)
+    if err != nil {
+        return
+    }
+
+    body := bytes.NewBuffer(b)
+    resp, err := http.Post(url, contentType, body)
+    if err != nil {
+        return
+    }
+    defer resp.Body.Close()
+}
+
+
+func sendend(currentrank int) {
+    url := "http://127.0.0.1:8080"
+    contentType := "application/json;charset=utf-8"
+    data := "end:" + strconv.Itoa(currentrank)
+    msg := Message{Key: data}
+    b ,err := json.Marshal(msg)
+    if err != nil {
+        return
+    }
+
+    body := bytes.NewBuffer(b)
+    resp, err := http.Post(url, contentType, body)
+    if err != nil {
+        return
+    }
+    defer resp.Body.Close()
+}
+
+func sendtrainend(currentrank int) {
+    url := "http://127.0.0.1:8080"
+    contentType := "application/json;charset=utf-8"
+    data := "trainend:" + strconv.Itoa(currentrank)
+    msg := Message{Key: data}
+    b ,err := json.Marshal(msg)
+    if err != nil {
+        return
+    }
+
+    body := bytes.NewBuffer(b)
+    resp, err := http.Post(url, contentType, body)
+    if err != nil {
+        return
+    }
+    defer resp.Body.Close()
+}
+
 
 func trap(cancel context.CancelFunc) {
 	utils.Trap(func(sig os.Signal) {

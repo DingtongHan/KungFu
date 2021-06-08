@@ -9,10 +9,13 @@
 #
 # Command to run this script:
 # $ ./bin/kungfu-run -np 4 python3 examples/mnist_keras.py --n-epochs 10
-
+import socket
+import json
+import time
 import argparse
 import logging
-
+import os
+import requests
 import kungfu as kf
 import tensorflow as tf
 from kungfu.python import current_cluster_size, current_rank
@@ -21,7 +24,23 @@ from kungfu.tensorflow.optimizers import (PairAveragingOptimizer,
                                           SynchronousAveragingOptimizer,
                                           SynchronousSGDOptimizer)
 from kungfu.tensorflow.initializer import BroadcastGlobalVariablesCallback
+from kungfu.cmd import sendbegin,sendend,sendtrainend
 
+
+begintime=0
+endtime=0
+
+class SendCallback(tf.keras.callbacks.Callback):
+    def on_batch_begin(self, batch, logs={}):
+        global begintime
+        t0=time.time()
+        sendbegin()
+        begintime = begintime+(time.time()-t0)
+    def on_batch_end(self, batch, logs={}):
+        global endtime
+        t0=time.time()
+        sendend()
+        endtime = endtime+(time.time()-t0)
 
 def load_dataset():
     (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
@@ -70,10 +89,11 @@ def build_model(optimizer):
     # add a dense layer with number of classes of nodes and softmax
     model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
     # compile the model
+
     model.compile(optimizer=optimizer,
                   loss='sparse_categorical_crossentropy',
                   metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
-
+    
     return model
 
 
@@ -82,6 +102,7 @@ def train_model(model, dataset, n_epochs=1, batch_size=5000):
     shard_id = current_rank()
     train_data_size = len(dataset['x_train'])
 
+
     # calculate the offset for the data of the KungFu node
     shard_size = train_data_size // n_shards
     offset = batch_size * shard_id
@@ -89,6 +110,12 @@ def train_model(model, dataset, n_epochs=1, batch_size=5000):
     # extract the data for learning of the KungFu node
     x = dataset['x_train'][offset:offset + shard_size]
     y = dataset['y_train'][offset:offset + shard_size]
+    save_dir = os.path.join(os.getcwd(), 'saved_models')
+    filepath = "model_"+str(shard_id)+".hdf5"
+    if(os.path.exists(os.path.join(save_dir,filepath))):
+        model.predict(x)
+        model.load_weights(os.path.join(save_dir,filepath),by_name=True)
+    checkpoint =tf.keras.callbacks.ModelCheckpoint(os.path.join(save_dir,filepath),verbose=1,save_weights_only=True,save_best_only = True, monitor = "val_loss")
     # train the model
     model.fit(x,
               y,
@@ -96,8 +123,7 @@ def train_model(model, dataset, n_epochs=1, batch_size=5000):
               epochs=n_epochs,
               validation_data=(dataset['x_val'], dataset['y_val']),
               verbose=2,
-              callbacks=[BroadcastGlobalVariablesCallback()])
-
+              callbacks=[BroadcastGlobalVariablesCallback(),checkpoint,SendCallback()])
 
 def test_model(model, dataset):
     test_metrics = model.evaluate(dataset['x_test'],
@@ -135,6 +161,8 @@ def main():
     optimizer = build_optimizer(args.kf_optimizer)
     # build the Tensorflow model
     model = build_model(optimizer)
+    
+    
     # load mnist dataset
     dataset = load_dataset()
     # train the Tensorflow model
@@ -145,3 +173,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+    sendtrainend()
+    print("begintime:"+str(begintime))
+    print("endtime:"+str(endtime))

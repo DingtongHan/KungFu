@@ -14,6 +14,7 @@ var Std = StdWriters{
 type StdReaders struct {
 	Stdout io.Reader
 	Stderr io.Reader
+	Flagmachi int
 }
 
 type StdWriters struct {
@@ -30,11 +31,18 @@ func (r *StdReaders) Stream(ws ...*StdWriters) interface{ Wait() } {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		Tee(r.Stdout, outs...)
+		Tee(r.Stderr, errs...)
 		wg.Done()
 	}()
 	go func() {
-		Tee(r.Stderr, errs...)
+		errlalalalalalala := Tee(r.Stdout, outs...)
+		if errlalalalalalala != nil{
+			erros := errlalalalalalala.Error()
+			if  erros == "some machine died"{
+				r.Flagmachi = 1
+			}
+		}
+		
 		wg.Done()
 	}()
 	return &wg

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
+	//"bytes"
 	"strings"
 	"sync"
+	"strconv"
 	"sync/atomic"
-
 	"github.com/lsds/KungFu/srcs/go/log"
 	"github.com/lsds/KungFu/srcs/go/proc"
 	"github.com/lsds/KungFu/srcs/go/utils/iostream"
@@ -49,21 +50,59 @@ func runWith(redirectors []*iostream.StdWriters, cmd *exec.Cmd) error {
 	if err != nil {
 		return err
 	}
+	
 	defer stderr.Close()
-	results := iostream.StdReaders{Stdout: stdout, Stderr: stderr}
+	results := iostream.StdReaders{Stdout: stdout, Stderr: stderr, Flagmachi: 0}
 	ioDone := results.Stream(redirectors...)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
+	defer stderr.Close()
 	ioDone.Wait() // call this before cmd.Wait!
-	return cmd.Wait()
+	errs := cmd.Wait()
+	if errs == nil {
+		if results.Flagmachi == 1{
+			return fmt.Errorf("some machine died")
+		} else{
+			return errs
+		}
+	}else{
+		return errs
+	}
+	
 }
-
 func RunAll(ctx context.Context, ps []proc.Proc, verboseLog bool) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var wg sync.WaitGroup
 	var fail int32
+	var dumpmachine int32
+	wg.Add(1)
+	go func(){
+            epochss := "-epoch="+strconv.Itoa(len(ps))
+	    args := []string{"run","examples/monitor.go", epochss}
+            //args := []string{"examples/monitor.py", "--n-epochs",strconv.Itoa(len(ps))}
+            r := &Runner{
+			Name:          "monitor",
+			Color:         xterm.BasicColors.Choose(0),
+			VerboseLog:    verboseLog,
+			LogFilePrefix: strings.Replace("monitor", "/", "-", -1),
+			LogDir:        "",
+		}
+		if err := r.Run(exec.Command("go", args...)); err != nil {
+			log.Errorf("exited with error: %v", err)
+			errorst := err.Error()
+			if errorst == "some machine died"{
+				atomic.AddInt32(&dumpmachine, 1)
+			}
+			atomic.AddInt32(&fail, 1)
+			cancel()
+		} else {
+			log.Infof("finished successfully")
+		}
+		wg.Done()
+	
+	}()
 	for i, p := range ps {
 		wg.Add(1)
 		go func(i int, p proc.Proc) {
@@ -85,8 +124,13 @@ func RunAll(ctx context.Context, ps []proc.Proc, verboseLog bool) error {
 		}(i, p)
 	}
 	wg.Wait()
+	
 	if fail != 0 {
-		return fmt.Errorf("%d tasks failed", fail)
+		if dumpmachine != 0{
+			return fmt.Errorf("server dump")
+		}else{
+			return fmt.Errorf("%d tasks failed", fail)
+		}
 	}
 	return nil
 }
