@@ -18,12 +18,11 @@ func Tee(r io.Reader, ws ...io.Writer) error {
 			return err
 		}
 		for _, w := range ws {
-                        fmt.Fprintln(w, string(line))
-			if string(line) == "some machine died"{
+			fmt.Fprintln(w, string(line))
+			if string(line) == "some machine died" {
 				return fmt.Errorf("some machine died")
 			}
-			
-			
+
 		}
 	}
 }

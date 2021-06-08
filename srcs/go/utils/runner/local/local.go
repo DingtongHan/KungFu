@@ -6,14 +6,14 @@ import (
 	"os/exec"
 	"path"
 	//"bytes"
-	"strings"
-	"sync"
-	"strconv"
-	"sync/atomic"
 	"github.com/lsds/KungFu/srcs/go/log"
 	"github.com/lsds/KungFu/srcs/go/proc"
 	"github.com/lsds/KungFu/srcs/go/utils/iostream"
 	"github.com/lsds/KungFu/srcs/go/utils/xterm"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 type Runner struct {
@@ -50,7 +50,7 @@ func runWith(redirectors []*iostream.StdWriters, cmd *exec.Cmd) error {
 	if err != nil {
 		return err
 	}
-	
+
 	defer stderr.Close()
 	results := iostream.StdReaders{Stdout: stdout, Stderr: stderr, Flagmachi: 0}
 	ioDone := results.Stream(redirectors...)
@@ -61,15 +61,15 @@ func runWith(redirectors []*iostream.StdWriters, cmd *exec.Cmd) error {
 	ioDone.Wait() // call this before cmd.Wait!
 	errs := cmd.Wait()
 	if errs == nil {
-		if results.Flagmachi == 1{
+		if results.Flagmachi == 1 {
 			return fmt.Errorf("some machine died")
-		} else{
+		} else {
 			return errs
 		}
-	}else{
+	} else {
 		return errs
 	}
-	
+
 }
 func RunAll(ctx context.Context, ps []proc.Proc, verboseLog bool) error {
 	ctx, cancel := context.WithCancel(ctx)
@@ -78,11 +78,11 @@ func RunAll(ctx context.Context, ps []proc.Proc, verboseLog bool) error {
 	var fail int32
 	var dumpmachine int32
 	wg.Add(1)
-	go func(){
-            epochss := "-epoch="+strconv.Itoa(len(ps))
-	    args := []string{"run","examples/monitor.go", epochss}
-            //args := []string{"examples/monitor.py", "--n-epochs",strconv.Itoa(len(ps))}
-            r := &Runner{
+	go func() {
+		epochss := "-epoch=" + strconv.Itoa(len(ps))
+		args := []string{"run", "examples/monitor.go", epochss}
+		//args := []string{"examples/monitor.py", "--n-epochs",strconv.Itoa(len(ps))}
+		r := &Runner{
 			Name:          "monitor",
 			Color:         xterm.BasicColors.Choose(0),
 			VerboseLog:    verboseLog,
@@ -92,7 +92,7 @@ func RunAll(ctx context.Context, ps []proc.Proc, verboseLog bool) error {
 		if err := r.Run(exec.Command("go", args...)); err != nil {
 			log.Errorf("exited with error: %v", err)
 			errorst := err.Error()
-			if errorst == "some machine died"{
+			if errorst == "some machine died" {
 				atomic.AddInt32(&dumpmachine, 1)
 			}
 			atomic.AddInt32(&fail, 1)
@@ -101,7 +101,7 @@ func RunAll(ctx context.Context, ps []proc.Proc, verboseLog bool) error {
 			log.Infof("finished successfully")
 		}
 		wg.Done()
-	
+
 	}()
 	for i, p := range ps {
 		wg.Add(1)
@@ -124,11 +124,11 @@ func RunAll(ctx context.Context, ps []proc.Proc, verboseLog bool) error {
 		}(i, p)
 	}
 	wg.Wait()
-	
+
 	if fail != 0 {
-		if dumpmachine != 0{
+		if dumpmachine != 0 {
 			return fmt.Errorf("server dump")
-		}else{
+		} else {
 			return fmt.Errorf("%d tasks failed", fail)
 		}
 	}

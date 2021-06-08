@@ -12,8 +12,8 @@ var Std = StdWriters{
 }
 
 type StdReaders struct {
-	Stdout io.Reader
-	Stderr io.Reader
+	Stdout    io.Reader
+	Stderr    io.Reader
 	Flagmachi int
 }
 
@@ -36,13 +36,13 @@ func (r *StdReaders) Stream(ws ...*StdWriters) interface{ Wait() } {
 	}()
 	go func() {
 		errlalalalalalala := Tee(r.Stdout, outs...)
-		if errlalalalalalala != nil{
+		if errlalalalalalala != nil {
 			erros := errlalalalalalala.Error()
-			if  erros == "some machine died"{
+			if erros == "some machine died" {
 				r.Flagmachi = 1
 			}
 		}
-		
+
 		wg.Done()
 	}()
 	return &wg

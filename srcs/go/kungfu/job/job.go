@@ -24,7 +24,7 @@ type Job struct {
 	Prog         string
 	Args         []string
 	LogDir       string
-	AllowNVLink bool
+	AllowNVLink  bool
 }
 
 func (j Job) NewMProc(peer plan.PeerID, gpuID int, initClusterVersion int, cluster plan.Cluster, num int) proc.Proc {
@@ -59,8 +59,8 @@ func (j Job) NewMProc(peer plan.PeerID, gpuID int, initClusterVersion int, clust
 			pubAddr = h.PublicAddr
 		}
 	}
-    monitorargs := []string{"examples/monitor.py","--n-epochs", "10"}
-//strconv.Itoa(num)
+	monitorargs := []string{"examples/monitor.py", "--n-epochs", "10"}
+	//strconv.Itoa(num)
 	return proc.Proc{
 		Name:     fmt.Sprintf("%s.%d", plan.FormatIPv4(peer.IPv4), peer.Port),
 		Prog:     j.Prog,
@@ -70,7 +70,6 @@ func (j Job) NewMProc(peer plan.PeerID, gpuID int, initClusterVersion int, clust
 		LogDir:   j.LogDir,
 	}
 }
-
 
 func (j Job) NewProc(peer plan.PeerID, gpuID int, initClusterVersion int, cluster plan.Cluster) proc.Proc {
 	envs := proc.Envs{
@@ -119,9 +118,9 @@ func (j Job) CreateProcs(cluster plan.Cluster, host uint32) []proc.Proc {
 	var ps []proc.Proc
 	//var num int = 0
 	for _, self := range cluster.Workers.On(host) {
-	    localRank, _ := cluster.Workers.LocalRank(self)
-	    proc := j.NewProc(self, localRank, 0, cluster)
-	    ps = append(ps, proc)
+		localRank, _ := cluster.Workers.LocalRank(self)
+		proc := j.NewProc(self, localRank, 0, cluster)
+		ps = append(ps, proc)
 	}
 
 	return ps

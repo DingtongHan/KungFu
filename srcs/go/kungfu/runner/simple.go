@@ -12,16 +12,16 @@ import (
 
 func SimpleRun(ctx context.Context, selfIPv4 uint32, cluster plan.Cluster, j job.Job, verboseLog bool) {
 	procs := j.CreateProcs(cluster, selfIPv4)
-	log.Infof("%s",ctx)
+	log.Infof("%s", ctx)
 
 	log.Infof("will parallel run %d instances of %s with %q", len(procs), j.Prog, j.Args)
 	d, err := utils.Measure(func() error { return local.RunAll(ctx, procs, verboseLog) })
 	log.Infof("all %d/%d local peers finished, took %s", len(procs), len(cluster.Workers), d)
 	if err != nil {
 		erros := err.Error()
-		if erros == "server dump"{
-			SimpleRun(ctx,selfIPv4, cluster, j, verboseLog)
-		}else{
+		if erros == "server dump" {
+			SimpleRun(ctx, selfIPv4, cluster, j, verboseLog)
+		} else {
 			utils.ExitErr(err)
 		}
 	}
